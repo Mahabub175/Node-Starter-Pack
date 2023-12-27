@@ -30,7 +30,7 @@ export const checkCurrentPasswordToPreviousPassword = async (
   return match;
 };
 
-export const getPreviousPasswordFromPreviousPassword = async (
+export const getPreviousPasswords = async (
   previousPass: TPreviousPasswords[]
 ) => {
   const sortingLastPassword = previousPass.sort(

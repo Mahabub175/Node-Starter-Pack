@@ -3,6 +3,7 @@ import { userRole } from "./user.constants";
 import { TCreateUser, TPreviousPasswords } from "./user.interface";
 import bcrypt from "bcrypt";
 import config from "../../config";
+import hashPassword from "../../middlewares/passwordHash";
 
 const previousPasswordsSchema = new Schema<TPreviousPasswords>({
   password: {
@@ -52,10 +53,7 @@ const createUserSchema = new Schema<TCreateUser>(
 );
 
 createUserSchema.pre("save", async function (next) {
-  this.password = await bcrypt.hash(
-    this.password,
-    Number(config.bcrypt_salt_rounds)
-  );
+  this.password = await hashPassword(this.password);
   next();
 });
 

@@ -13,7 +13,7 @@ const createCategoryIntoDB = async (categoryData: TCategory) => {
 };
 
 const getAllCategoryFromDB = async () => {
-  const result = await CategoryModel.find();
+  const result = await CategoryModel.find().populate("user");
   return result;
 };
 
