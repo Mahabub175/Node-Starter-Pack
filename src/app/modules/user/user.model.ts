@@ -33,10 +33,9 @@ const createUserSchema = new Schema<TCreateUser>(
     password: {
       type: String,
       required: true,
-      select: false,
+      select: 0,
       trim: true,
     },
-
     role: {
       type: String,
       enum: userRole,
@@ -45,7 +44,7 @@ const createUserSchema = new Schema<TCreateUser>(
     },
     previousPasswords: {
       type: [previousPasswordsSchema],
-      select: false,
+      select: 0,
       trim: true,
     },
   },

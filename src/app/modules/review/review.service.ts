@@ -1,7 +1,6 @@
 import { CourseModel } from "../course/course.model";
 import { TReview } from "./review.interface";
 import { ReviewModel } from "./review.model";
-import mongoose from "mongoose";
 
 const createReviewIntoDB = async (reviewData: TReview) => {
   const courseExist = await CourseModel.findById(reviewData.courseId);
