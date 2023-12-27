@@ -15,7 +15,7 @@ app.get("/", (req: Request, res: Response) => {
   res.send({
     success: true,
     status: "connected",
-    message: "Welcome to Our Courses!",
+    message: "Welcome to Our Secured Courses!",
   });
 });
 
