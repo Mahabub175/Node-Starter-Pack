@@ -9,7 +9,11 @@ const createCategory = async (
 ) => {
   try {
     const categoryData = req.body;
-    const result = await CategoryServices.createCategoryIntoDB(categoryData);
+    const useData = req.user;
+    const result = await CategoryServices.createCategoryIntoDB(
+      categoryData,
+      useData
+    );
     res.status(200).json({
       success: true,
       statusCode: httpStatus.OK,

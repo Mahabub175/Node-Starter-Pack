@@ -1,13 +1,14 @@
 import mongoose from "mongoose";
 import config from "../../config";
 import {
+  checkCurrentPasswordToPreviousPassword,
   compareHashPassword,
   getPreviousPasswords,
+  hashPassword,
 } from "../../utils/passwordUtils";
 import { TCreateUser } from "./user.interface";
 import { userModel } from "./user.model";
 import jwt from "jsonwebtoken";
-import hashPassword from "../../middlewares/passwordHash";
 
 const createUserIntoDb = async (userData: TCreateUser) => {
   const result = await userModel.create(userData);
@@ -51,7 +52,7 @@ const loginUser = async (userData: { username: string; password: string }) => {
       _id: user?._id,
       username: user?.username,
       email: user?.email,
-      role: user.role,
+      role: user?.role,
     },
     token,
   };
@@ -61,103 +62,111 @@ const changeUserPassword = async (
   userId: string,
   userData: { currentPass: string; newPass: string }
 ) => {
+  const user = await userModel
+    .findById(userId)
+    .select("password previousPasswords");
+
+  const matchPassword = await compareHashPassword(
+    userData?.currentPass,
+    userData?.newPass
+  );
+
+  if (!matchPassword) {
+    throw new Error("Passwords do not match! Please try again!");
+  }
+
   const session = await mongoose.startSession();
+
   try {
     session.startTransaction();
-
-    const user = await userModel
-      .findById(userId)
-      .select("password previousPasswords")
-      .session(session);
-
-    const matchPassword = await compareHashPassword(
-      userData.currentPass,
+    const previousPasswords = user?.previousPasswords;
+    const compareCurrentAndPreviousPasswords = await compareHashPassword(
+      userData?.newPass,
       user?.password as string
     );
 
-    if (!matchPassword) {
-      throw new Error("Passwords didn't match! Please try again.");
-    }
-
-    const previousPasswords: any = user?.previousPasswords || [];
-
-    const matchingCurrentAndPreviousPasswords = previousPasswords.some(
-      (prevPassword: any) =>
-        compareHashPassword(userData.newPass, prevPassword.password)
-    );
-
-    if (matchingCurrentAndPreviousPasswords) {
+    if (compareCurrentAndPreviousPasswords) {
       throw new Error(
-        "Password change failed. Ensure the new password is unique and not among the last 2 used."
+        "Password Change Failed! Please Ensure that new password in unique from the previous used 2 passwords!"
       );
     }
 
-    const hashedPassword = await hashPassword(userData.newPass);
-
-    if (previousPasswords.length > 0) {
-      const crossMatch = previousPasswords.some((prevPassword: any) =>
-        compareHashPassword(userData.newPass, prevPassword.password)
+    const hashedPassword = await hashPassword(userData?.newPass);
+    if (previousPasswords && previousPasswords.length > 0) {
+      const crossCheck = await checkCurrentPasswordToPreviousPassword(
+        userData?.newPass,
+        previousPasswords
       );
-
-      if (crossMatch) {
+      if (crossCheck) {
         throw new Error(
-          "Password change failed. Ensure the new password is unique and not among the last 2 used."
+          "Password Change Failed! Please Ensure that new password in unique from the previous used 2 passwords!"
         );
       }
-    }
+      if (previousPasswords.length >= 2) {
+        const lastPreviousPassword = await getPreviousPasswords(
+          previousPasswords
+        );
 
-    if (previousPasswords.length >= 2) {
-      const lastUsedPassword = previousPasswords[previousPasswords.length - 1];
-
-      const deletePreviousPassword = await userModel.findByIdAndUpdate(
-        userId,
-        {
-          $pull: {
-            previousPasswords: {
-              password: lastUsedPassword.password,
+        const deletePreviousPassword = await userModel.findByIdAndUpdate(
+          userId,
+          {
+            $pull: {
+              previousPasswords: {
+                password: lastPreviousPassword.password,
+              },
             },
           },
-        },
-        {
-          session,
-          runValidators: true,
+          {
+            session,
+            runValidators: true,
+          }
+        );
+        if (!deletePreviousPassword) {
+          throw new Error("Failed to change password!");
         }
-      );
-
-      if (!deletePreviousPassword) {
-        throw new Error("Failed to change password");
-      }
-    }
-
-    const changedPassword = await userModel.findByIdAndUpdate(
-      userId,
-      {
-        password: hashedPassword,
-        $addToSet: {
-          previousPasswords: {
+        const changePassword = await userModel.findByIdAndUpdate(
+          userId,
+          {
             password: hashedPassword,
-            createdAt: new Date(),
+            $addToSet: {
+              previousPasswords: {
+                password: hashedPassword,
+                createdAt: new Date(),
+              },
+            },
           },
-        },
-      },
-      {
-        session,
-        runValidators: true,
-        new: true,
+          {
+            session,
+            runValidators: true,
+          }
+        );
+        if (!changePassword) {
+          throw new Error("Failed to change password!");
+        } else {
+          const changePassword = await userModel.findByIdAndUpdate(userId, {
+            password: hashedPassword,
+            $addToSet: {
+              previousPasswords: {
+                password: hashedPassword,
+                createdAt: new Date(),
+              },
+            },
+          });
+          if (!changePassword) {
+            throw new Error("Failed to change password!");
+          }
+        }
+        await session.commitTransaction();
+        await session.endSession();
+
+        const updatedUser = await userModel.findById(userId);
+        return updatedUser;
       }
-    );
-
-    if (!changedPassword) {
-      throw new Error("Failed to change password");
     }
-
-    await session.commitTransaction();
-    return changedPassword;
-  } catch (error) {
+  } catch (error: any) {
     await session.abortTransaction();
-    throw error;
-  } finally {
-    session.endSession();
+    await session.endSession();
+    throw new Error(error);
   }
 };
 

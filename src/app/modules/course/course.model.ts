@@ -36,7 +36,7 @@ const courseSchema = new Schema<TCourse>(
       description: { type: String, required: true, trim: true },
     },
     createdBy: {
-      type: Schema.ObjectId,
+      type: Schema.Types.ObjectId,
       ref: "User",
     },
   },

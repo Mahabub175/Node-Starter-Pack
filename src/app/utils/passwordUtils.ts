@@ -1,10 +1,15 @@
 import bcrypt from "bcrypt";
 import { TPreviousPasswords } from "../modules/user/user.interface";
 import moment from "moment";
+import config from "../config";
 
-// export const hashingPassword=async (password:string)=>{
-//     const hashPassword=
-// }
+export const hashPassword = async (password: string) => {
+  const hashedPassword = await bcrypt.hash(
+    password,
+    Number(config.bcrypt_salt_rounds as string)
+  );
+  return hashedPassword;
+};
 
 export const compareHashPassword = async (
   plainPass: string,

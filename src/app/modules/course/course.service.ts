@@ -4,8 +4,12 @@ import { ReviewModel } from "../review/review.model";
 import { TCourse } from "./course.interface";
 import { CourseModel } from "./course.model";
 import { calculateWeeks } from "../../utils/calculateWeeks";
+import { JwtPayload } from "jsonwebtoken";
 
-const createCourseIntoDB = async (courseData: TCourse) => {
+const createCourseIntoDB = async (
+  courseData: TCourse,
+  userData: JwtPayload
+) => {
   const categoryExists = await CategoryModel.findById({
     _id: courseData.categoryId,
   });
@@ -15,7 +19,11 @@ const createCourseIntoDB = async (courseData: TCourse) => {
         courseData?.startDate,
         courseData?.endDate
       );
-      const newData = { ...courseData, durationInWeeks };
+      const newData = {
+        ...courseData,
+        durationInWeeks,
+        createdBy: userData?.userId,
+      };
       const result = await CourseModel.create(newData);
       return result;
     }
@@ -69,7 +77,9 @@ const getAllCourseFromDB = async (query: Record<string, unknown>) => {
     delete queryObj["maxPrice"];
   }
 
-  const result = CourseModel.find(queryObj).populate("categoryId");
+  const result = CourseModel.find(queryObj)
+    .populate("categoryId")
+    .populate("createdBy");
 
   let limit = 10;
   let page = 1;
@@ -264,7 +274,7 @@ const updateCourseIntoDB = async (
       await session.commitTransaction();
       await session.endSession();
 
-      const result = await CourseModel.findById(courseId);
+      const result = await CourseModel.findById(courseId).populate("createdBy");
 
       return result;
     } catch (error: any) {

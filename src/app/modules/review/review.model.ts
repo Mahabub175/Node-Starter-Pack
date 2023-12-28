@@ -12,7 +12,7 @@ const reviewSchema = new Schema<TReview>(
     rating: { type: Number, required: true, trim: true },
     review: { type: String, required: true, trim: true },
     createdBy: {
-      type: Schema.ObjectId,
+      type: Schema.Types.ObjectId,
       ref: "User",
     },
   },

@@ -1,9 +1,7 @@
 import { Schema, model } from "mongoose";
 import { userRole } from "./user.constants";
 import { TCreateUser, TPreviousPasswords } from "./user.interface";
-import bcrypt from "bcrypt";
-import config from "../../config";
-import hashPassword from "../../middlewares/passwordHash";
+import { hashPassword } from "../../utils/passwordUtils";
 
 const previousPasswordsSchema = new Schema<TPreviousPasswords>({
   password: {

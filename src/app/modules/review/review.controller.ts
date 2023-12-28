@@ -9,7 +9,11 @@ const createReview = async (
 ) => {
   try {
     const reviewData = req.body;
-    const result = await ReviewServices.createReviewIntoDB(reviewData);
+    const userData = req.user;
+    const result = await ReviewServices.createReviewIntoDB(
+      reviewData,
+      userData
+    );
 
     res.status(200).json({
       success: true,
