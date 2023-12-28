@@ -60,15 +60,15 @@ const loginUser = async (userData: { username: string; password: string }) => {
 
 const changeUserPassword = async (
   userId: string,
-  userData: { currentPass: string; newPass: string }
+  userData: { currentPassword: string; newPassword: string }
 ) => {
   const user = await userModel
     .findById(userId)
     .select("password previousPasswords");
 
   const matchPassword = await compareHashPassword(
-    userData?.currentPass,
-    userData?.newPass
+    userData?.currentPassword,
+    user?.password as string
   );
 
   if (!matchPassword) {
@@ -81,7 +81,7 @@ const changeUserPassword = async (
     session.startTransaction();
     const previousPasswords = user?.previousPasswords;
     const compareCurrentAndPreviousPasswords = await compareHashPassword(
-      userData?.newPass,
+      userData?.newPassword,
       user?.password as string
     );
 
@@ -91,10 +91,10 @@ const changeUserPassword = async (
       );
     }
 
-    const hashedPassword = await hashPassword(userData?.newPass);
+    const hashedPassword = await hashPassword(userData?.newPassword);
     if (previousPasswords && previousPasswords.length > 0) {
       const crossCheck = await checkCurrentPasswordToPreviousPassword(
-        userData?.newPass,
+        userData?.newPassword,
         previousPasswords
       );
       if (crossCheck) {

@@ -119,20 +119,15 @@ const getAllCourseFromDB = async (query: Record<string, unknown>) => {
 };
 
 const getSingleCourseWithReviewFromDB = async (courseId: string) => {
-  const singleCourse = await CourseModel.findById(courseId);
+  const singleCourse = await CourseModel.findById(courseId).populate({
+    path: "createdBy",
+    select: "_id username email role",
+  });
   if (singleCourse) {
-    const validCourseId = new Types.ObjectId(courseId);
-    const reviews = await ReviewModel.aggregate([
-      { $match: { courseId: validCourseId } },
-      {
-        $project: {
-          _id: 0,
-          courseId: 1,
-          rating: 1,
-          review: 1,
-        },
-      },
-    ]);
+    const reviews = await ReviewModel.find({ courseId }).populate({
+      path: "createdBy",
+      select: "_id username email role",
+    });
     const result = { singleCourse, reviews };
     return result;
   } else {
@@ -304,11 +299,26 @@ const getBestCourseFromDB = async () => {
         as: "course",
       },
     },
+    {
+      $lookup: {
+        from: "users",
+        localField: "course.createdBy",
+        foreignField: "_id",
+        as: "createdBy",
+      },
+    },
+    {
+      $project: {
+        "createdBy.password": 0,
+        "createdBy.previousPasswords": 0,
+      },
+    },
   ]);
 
   const result = bestCourse.map((item) => {
     return {
       course: item.course[0],
+      createdBy: item.createdBy[0],
       averageRating: parseFloat(item.averageRating.toFixed(1)),
       reviewCount: item.reviewCount,
     };
