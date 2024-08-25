@@ -1,14 +1,13 @@
 import { Router } from "express";
-import { CourseRoutes } from "../modules/course/course.route";
-import { CategoryRoutes } from "../modules/category/category.route";
-import { ReviewRoutes } from "../modules/review/review.route";
-import { UserRoutes } from "../modules/user/user.route";
+import { testRoutes } from "../modules/test/test.route";
+import { uploadRoutes } from "../modules/upload/upload.route";
 
 const router = Router();
 
-router.use(CourseRoutes);
-router.use(CategoryRoutes);
-router.use(ReviewRoutes);
-router.use(UserRoutes);
+const routes = [testRoutes, uploadRoutes];
+
+routes.forEach((route) => {
+  router.use(route);
+});
 
 export default router;
