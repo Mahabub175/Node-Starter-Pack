@@ -10,6 +10,6 @@ const storage: StorageEngine = multer.diskStorage({
   },
 });
 
-const upload = multer({ storage });
+const uploadService = multer({ storage });
 
-export { upload };
+export { uploadService };

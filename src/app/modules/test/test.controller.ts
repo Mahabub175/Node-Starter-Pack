@@ -1,9 +1,9 @@
 import { NextFunction, Request, Response } from "express";
 import { testServices } from "./test.service";
-import { upload } from "../upload/upload";
 import { testValidationSchemas } from "./test.validation";
+import { uploadService } from "../upload/upload";
 
-const uploadMiddleware = upload.single("attachment");
+const uploadMiddleware = uploadService.single("attachment");
 
 const createTestController = async (
   req: Request,
@@ -20,14 +20,12 @@ const createTestController = async (
     }
 
     try {
-      const { name, email, number } = req.body;
+      const data = req.body;
 
       const filePath = req.file ? req.file.path : undefined;
 
       const formData = {
-        name,
-        email,
-        number,
+        ...data,
         attachment: filePath,
       };
 
@@ -66,7 +64,16 @@ const getAllTestController = async (
     const pageNumber = page ? parseInt(page as string, 10) : undefined;
     const pageSize = limit ? parseInt(limit as string, 10) : undefined;
 
-    const result = await testServices.getAllTestService(pageNumber, pageSize);
+    const searchText = req.query.searchText as string | undefined;
+
+    const searchFields = ["name", "email", "number"];
+
+    const result = await testServices.getAllTestService(
+      pageNumber,
+      pageSize,
+      searchText,
+      searchFields
+    );
 
     res.status(200).json({
       success: true,
@@ -103,18 +110,38 @@ const updateSingleTestController = async (
   res: Response,
   next: NextFunction
 ) => {
-  try {
-    const { testId } = req.params;
-    const testData = req.body;
-    const result = await testServices.updateSingleTestService(testId, testData);
-    res.status(200).json({
-      success: true,
-      message: "Single Test Updated Successfully!",
-      data: result,
-    });
-  } catch (error: any) {
-    next(error);
-  }
+  uploadMiddleware(req, res, async (err) => {
+    if (err) {
+      return res.status(400).json({
+        success: false,
+        message: "File upload failed",
+        error: err.message,
+      });
+    }
+    try {
+      const { testId } = req.params;
+      const data = req.body;
+      const filePath = req.file ? req.file.path : undefined;
+
+      const testData = {
+        ...data,
+        attachment: filePath,
+      };
+
+      const result = await testServices.updateSingleTestService(
+        testId,
+        testData
+      );
+
+      res.status(200).json({
+        success: true,
+        message: "Single Test Updated Successfully!",
+        data: result,
+      });
+    } catch (error: any) {
+      next(error);
+    }
+  });
 };
 
 //Delete single test controller

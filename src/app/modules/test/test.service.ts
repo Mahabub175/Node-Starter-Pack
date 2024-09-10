@@ -1,7 +1,8 @@
-import mongoose from "mongoose";
+import mongoose, { ObjectId } from "mongoose";
 import { paginateAndSort } from "../../utils/paginateAndSort";
 import { ITest } from "./test.interface";
 import { testModel } from "./test.model";
+import { formatResultImage } from "../../utils/formatResultImage";
 
 //Create a test into database
 const createTestService = async (userData: ITest, filePath?: string) => {
@@ -11,15 +12,34 @@ const createTestService = async (userData: ITest, filePath?: string) => {
 };
 
 // Get all tests with optional pagination
-const getAllTestService = async (page?: number, limit?: number) => {
-  if (page || limit) {
-    const query = testModel.find();
+const getAllTestService = async (
+  page?: number,
+  limit?: number,
+  searchText?: string,
+  searchFields?: string[]
+) => {
+  let results;
 
-    const result = await paginateAndSort(query, page, limit);
+  if (page && limit) {
+    const query = testModel.find();
+    const result = await paginateAndSort(
+      query,
+      page,
+      limit,
+      searchText,
+      searchFields
+    );
+
+    result.results = formatResultImage<ITest>(
+      result.results,
+      "attachment"
+    ) as ITest[];
 
     return result;
   } else {
-    const results = await testModel.find().exec();
+    results = await testModel.find().exec();
+
+    results = formatResultImage(results, "attachment");
 
     return {
       results,
@@ -29,22 +49,31 @@ const getAllTestService = async (page?: number, limit?: number) => {
 
 //Get single test
 const getSingleTestService = async (testId: number | string) => {
+  // Convert string ID to ObjectId if necessary
   const queryId =
     typeof testId === "string" ? new mongoose.Types.ObjectId(testId) : testId;
 
+  // Check if the test exists
   const testExists = await testModel.isTestExists(queryId as number | string);
   if (!testExists) {
     throw new Error("Test not found");
   }
 
+  // Find the test by ID
   const result = await testModel.findById(queryId).exec();
   if (!result) {
     throw new Error("Test not found");
   }
 
+  if (typeof result.attachment === "string") {
+    const formattedAttachment = formatResultImage<ITest>(result.attachment);
+    if (typeof formattedAttachment === "string") {
+      result.attachment = formattedAttachment;
+    }
+  }
+
   return result;
 };
-
 //Update single test
 const updateSingleTestService = async (
   testId: string | number,

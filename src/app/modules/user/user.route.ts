@@ -7,22 +7,33 @@ import auth from "../../middlewares/auth";
 const router = express.Router();
 
 router.post(
-  "/auth/register",
+  "/auth/register/",
   validateRequest(userValidationSchemas.createUserValidationSchema),
-  userControllers.createUser
+  userControllers.createUserController
 );
 
 router.post(
-  "/auth/login",
+  "/auth/login/",
   validateRequest(userValidationSchemas.userLoginValidationSchema),
-  userControllers.loginUser
+  userControllers.loginUserController
 );
 
 router.post(
-  "/auth/change-password",
+  "/auth/change-password/",
   auth("user", "admin"),
   validateRequest(userValidationSchemas.changePasswordValidationSchema),
-  userControllers.changeUserPassword
+  userControllers.changeUserPasswordController
 );
 
-export const UserRoutes = router;
+router.get("/auth/user/", userControllers.getAllUserController);
+
+router.get("/auth/user/:userId/", userControllers.getSingleUserController);
+
+router.patch(
+  "/auth/user/status/:userId/",
+  userControllers.updateUserStatusController
+);
+
+router.patch("/auth/user/:userId/", userControllers.updateSingleUserController);
+
+export const userRoutes = router;

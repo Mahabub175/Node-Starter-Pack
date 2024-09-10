@@ -1,6 +1,6 @@
-import { Schema, model } from "mongoose";
+import { Model, Schema, model } from "mongoose";
 import { userRole } from "./user.constants";
-import { TCreateUser, TPreviousPasswords } from "./user.interface";
+import { TPreviousPasswords, TUser } from "./user.interface";
 import { hashPassword } from "../../utils/passwordUtils";
 
 const previousPasswordsSchema = new Schema<TPreviousPasswords>({
@@ -15,7 +15,7 @@ const previousPasswordsSchema = new Schema<TPreviousPasswords>({
   },
 });
 
-const createUserSchema = new Schema<TCreateUser>(
+const userSchema = new Schema<TUser>(
   {
     username: {
       type: String,
@@ -38,8 +38,28 @@ const createUserSchema = new Schema<TCreateUser>(
     role: {
       type: String,
       enum: userRole,
-      required: true,
+      default: "user",
       trim: true,
+    },
+    status: {
+      type: String,
+      enum: ["active", "inactive"],
+      default: "active",
+      trim: true,
+    },
+    name: {
+      type: String,
+      required: false,
+      trim: true,
+    },
+    profile_image: {
+      type: String,
+      required: false,
+      trim: true,
+    },
+    total_amount: {
+      type: Number,
+      required: false,
     },
     previousPasswords: {
       type: [previousPasswordsSchema],
@@ -50,9 +70,22 @@ const createUserSchema = new Schema<TCreateUser>(
   { timestamps: true }
 );
 
-createUserSchema.pre("save", async function (next) {
+userSchema.pre("save", async function (next) {
   this.password = await hashPassword(this.password);
   next();
 });
 
-export const userModel = model<TCreateUser>("User", createUserSchema);
+// Define a static method for the model
+userSchema.statics.isCategoryExists = async function (
+  userId: number | string
+): Promise<boolean> {
+  const existingUser = await this.findOne({ _id: userId });
+  return !!existingUser;
+};
+
+// Create an interface that includes the static methods
+interface UserModel extends Model<TUser> {
+  isCategoryExists(userId: number | string): Promise<boolean>;
+}
+
+export const userModel = model<TUser, UserModel>("user", userSchema);
