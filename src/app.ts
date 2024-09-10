@@ -1,14 +1,12 @@
 import express, { Application, Request, Response } from "express";
 import cors from "cors";
 import fs from "fs";
+import path from "path";
+import router from "./app/routes";
 import { globalErrorHandler } from "./app/middlewares/globalErrorHandler";
 import { notFound } from "./app/middlewares/notFound";
-import router from "./app/routes";
-import path from "path";
 
 const app: Application = express();
-
-app.use(express.json());
 
 app.use(
   cors({
@@ -25,13 +23,16 @@ app.use(
   })
 );
 
+app.use(express.json());
+
 const uploadsPath = path.resolve("uploads");
 if (!fs.existsSync(uploadsPath)) {
   fs.mkdirSync(uploadsPath);
 }
-app.use("/uploads", express.static(path.join(__dirname, "uploads")));
 
-//api routes
+app.use("/uploads", express.static(uploadsPath));
+
+// API routes
 app.use("/api/v1", router);
 
 app.get("/", (req: Request, res: Response) => {

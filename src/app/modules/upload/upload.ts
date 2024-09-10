@@ -1,5 +1,4 @@
 import multer, { StorageEngine } from "multer";
-import path from "path";
 
 const storage: StorageEngine = multer.diskStorage({
   destination: (req, file, cb) => {
