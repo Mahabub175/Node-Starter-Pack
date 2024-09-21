@@ -6,17 +6,17 @@ export type TPreviousPasswords = {
 };
 
 export type TUser = {
-  username: string;
   email: string;
   password: string;
-  status: "active" | "inactive";
   name: string;
   profile_image: string;
-  role: "user" | "admin";
-  previousPasswords: TPreviousPasswords[];
+  address: string;
+  phone_number: string;
+  role: string;
+  previous_passwords: TPreviousPasswords[];
+  status: string;
   createdAt: string;
   updatedAt: string;
-  total_amount: number;
 };
 
 export type TUserRole = keyof typeof userRoleValue;

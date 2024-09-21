@@ -1,28 +1,16 @@
 import { Query } from "mongoose";
 
 export const applyFilters = (
-  query: any,
-  searchText?: string,
-  fields: string[] = []
+  query: Query<any[], any>,
+  searchText: string,
+  fields: string[]
 ) => {
-  if (searchText && fields.length > 0) {
+  if (searchText) {
     const regexPattern = new RegExp(searchText, "i");
 
-    const searchConditions = fields.map((field) => {
-      const fieldParts = field.split(".");
-
-      const searchCondition = fieldParts.reduceRight(
-        (acc: any, part, index) => {
-          if (index === fieldParts.length - 1) {
-            return { [part]: regexPattern };
-          }
-          return { [part]: acc };
-        },
-        {}
-      );
-
-      return searchCondition;
-    });
+    const searchConditions = fields.map((field) => ({
+      [field]: regexPattern,
+    }));
 
     query = query.where({ $or: searchConditions });
   }
@@ -34,7 +22,7 @@ export const paginateAndSort = async <T>(
   query: Query<T[], T>,
   page: number = 1,
   limit: number = 10,
-  searchText?: string,
+  searchText: string = "",
   fields: string[] = []
 ) => {
   const sortField: string = "createdAt";
@@ -44,15 +32,20 @@ export const paginateAndSort = async <T>(
   const pageSize = Math.max(1, limit);
   const skip = (pageNumber - 1) * pageSize;
 
-  query = applyFilters(query, searchText, fields);
+  const countQuery = applyFilters(query.clone(), searchText, fields);
 
-  const results = await query
-    .sort({ [sortField]: sortOrder === "desc" ? -1 : 1 })
+  const totalCount = await countQuery.model
+    .countDocuments(countQuery.getFilter())
+    .exec();
+
+  const results = await applyFilters(query, searchText, fields)
+    .sort({
+      [sortField]: sortOrder === "desc" ? -1 : 1,
+      _id: sortOrder === "desc" ? -1 : 1,
+    })
     .skip(skip)
     .limit(pageSize)
     .exec();
-
-  const totalCount = await query.model.countDocuments(query.getFilter()).exec();
 
   const meta = {
     page: pageNumber,

@@ -49,11 +49,9 @@ const getAllTestService = async (
 
 //Get single test
 const getSingleTestService = async (testId: number | string) => {
-  // Convert string ID to ObjectId if necessary
   const queryId =
     typeof testId === "string" ? new mongoose.Types.ObjectId(testId) : testId;
 
-  // Check if the test exists
   const testExists = await testModel.isTestExists(queryId as number | string);
   if (!testExists) {
     throw new Error("Test not found");

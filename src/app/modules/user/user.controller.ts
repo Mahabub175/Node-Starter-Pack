@@ -1,7 +1,7 @@
 import { NextFunction, Request, Response } from "express";
 import { userServices } from "./user.service";
 import httpStatus from "http-status";
-import { upload } from "../upload/upload";
+import { uploadService } from "../upload/upload";
 
 const createUserController = async (
   req: Request,
@@ -130,10 +130,6 @@ const updateUserStatusController = async (
     const { userId } = req.params;
     const { status } = req.body;
 
-    const categoryData = {
-      status,
-    };
-
     const result = await userServices.updateUserStatusService(userId, status);
 
     res.status(200).json({
@@ -151,7 +147,7 @@ const updateSingleUserController = async (
   res: Response,
   next: NextFunction
 ) => {
-  upload.single("profile_image")(req, res, async (err) => {
+  uploadService.single("profile_image")(req, res, async (err: any) => {
     if (err) {
       return res.status(400).json({
         success: false,

@@ -3,15 +3,24 @@ import { Request, Response, NextFunction } from "express";
 import { TUserRole } from "./../modules/user/user.interface";
 import config from "../config";
 import { userModel } from "../modules/user/user.model";
+import httpStatus from "http-status";
 
 const auth = (...requiredRoles: TUserRole[]) => {
   return async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const token = req.headers.authorization;
+      const authHeader = req.headers.authorization;
 
-      if (!token) {
-        throw new Error("Unauthorized Access!");
+      if (!authHeader) {
+        return res.status(httpStatus.UNAUTHORIZED).json({
+          success: false,
+          status: httpStatus.UNAUTHORIZED,
+          message: "No token provided",
+        });
       }
+
+      const token = authHeader.startsWith("Bearer ")
+        ? authHeader.slice(7)
+        : authHeader;
 
       const decode = jwt.verify(
         token,
@@ -22,18 +31,30 @@ const auth = (...requiredRoles: TUserRole[]) => {
 
       const user = await userModel.findById(userId);
       if (!user) {
-        throw new Error("User not found!");
+        return res.status(httpStatus.UNAUTHORIZED).json({
+          success: false,
+          status: httpStatus.UNAUTHORIZED,
+          message: "User not found",
+        });
       }
 
-      if (requiredRoles && !requiredRoles.includes(role)) {
-        throw new Error("Unauthorized Access!");
+      if (requiredRoles.length && !requiredRoles.includes(role)) {
+        return res.status(httpStatus.FORBIDDEN).json({
+          success: false,
+          status: httpStatus.FORBIDDEN,
+          message: "Unauthorized Access",
+        });
       }
 
       req.user = decode as JwtPayload;
 
       next();
     } catch (error) {
-      next(error);
+      return res.status(httpStatus.UNAUTHORIZED).json({
+        success: false,
+        status: httpStatus.UNAUTHORIZED,
+        message: "Invalid token",
+      });
     }
   };
 };

@@ -9,20 +9,19 @@ import {
   hashPassword,
 } from "../../utils/passwordUtils";
 import { paginateAndSort } from "../../utils/paginateAndSort";
-import { base_url } from "../../utils/base_url";
 import { TUser } from "./user.interface";
-import { applyFilters } from "../../utils/applyFilters";
-import { paymentModel } from "../payment/payment.model";
+import { Status } from "../../interface/global/global.interface";
+import { formatResultImage } from "../../utils/formatResultImage";
 
 const createUserService = async (userData: TUser) => {
   const result = await userModel.create(userData);
 
-  const { _id, username, email, role, createdAt, updatedAt } = result;
+  const { _id, email, role, name, createdAt, updatedAt } = result;
 
   const userInfo = {
     _id,
-    username,
     email,
+    name,
     role,
     createdAt,
     updatedAt,
@@ -32,12 +31,10 @@ const createUserService = async (userData: TUser) => {
 };
 
 const loginUserService = async (userData: {
-  usernameOrEmail: string;
+  email: string;
   password: string;
 }) => {
-  const query = userData.usernameOrEmail.includes("@")
-    ? { email: userData.usernameOrEmail }
-    : { username: userData.usernameOrEmail };
+  const query = { email: userData.email };
 
   const user = await userModel
     .findOne(query)
@@ -47,7 +44,7 @@ const loginUserService = async (userData: {
     throw new Error("User not found!");
   }
 
-  if (user.status !== "active") {
+  if (user.status !== Status.ACTIVE) {
     throw new Error("Your account is inactive. Please contact support.");
   }
 
@@ -69,7 +66,7 @@ const loginUserService = async (userData: {
   return {
     user: {
       _id: user._id,
-      username: user.username,
+      name: user.name,
       email: user.email,
       role: user.role,
     },
@@ -79,113 +76,97 @@ const loginUserService = async (userData: {
 
 const changeUserPasswordService = async (
   userId: string,
-  userData: { currentPassword: string; newPassword: string }
+  userData: { current_password: string; new_password: string }
 ) => {
   const user = await userModel
     .findById(userId)
-    .select("password previousPasswords");
+    .select("password previous_passwords");
 
+  if (!user) {
+    throw new Error("User not found!");
+  }
+
+  // Compare current password
   const matchPassword = await compareHashPassword(
-    userData?.currentPassword,
-    user?.password as string
+    userData.current_password,
+    user.password
   );
-
   if (!matchPassword) {
-    throw new Error("Passwords do not match! Please try again!");
+    throw new Error("Incorrect current password! Please try again.");
   }
 
   const session = await mongoose.startSession();
-
   try {
     session.startTransaction();
-    const previousPasswords = user?.previousPasswords;
-    const compareCurrentAndPreviousPasswords = await compareHashPassword(
-      userData?.newPassword,
-      user?.password as string
+
+    // Ensure the new password is not the same as the current password
+    const isSameAsCurrent = await compareHashPassword(
+      userData.new_password,
+      user.password
+    );
+    if (isSameAsCurrent) {
+      throw new Error(
+        "New password must be different from the current password."
+      );
+    }
+
+    const previousPasswords = user.previous_passwords || [];
+
+    // Check only against the last two passwords
+    const lastTwoPasswords = previousPasswords;
+    for (const previousPasswordObj of lastTwoPasswords) {
+      const isSameAsPrevious = await compareHashPassword(
+        userData.new_password,
+        previousPasswordObj.password
+      );
+      if (isSameAsPrevious) {
+        throw new Error(
+          "New password must not match any of the last two used passwords."
+        );
+      }
+    }
+
+    // Hash the new password
+    const hashedPassword = await hashPassword(userData.new_password);
+
+    // If there are more than 2 previous passwords, remove the oldest one
+    if (previousPasswords.length >= 2) {
+      await userModel.findByIdAndUpdate(
+        userId,
+        {
+          $pull: {
+            previous_passwords: { password: previousPasswords[0].password },
+          },
+        },
+        { session }
+      );
+    }
+
+    // Update the user password and add the new password to previous passwords
+    await userModel.findByIdAndUpdate(
+      userId,
+      {
+        password: hashedPassword,
+        $push: {
+          previous_passwords: {
+            password: hashedPassword,
+            createdAt: new Date(),
+          },
+        },
+      },
+      { session }
     );
 
-    if (compareCurrentAndPreviousPasswords) {
-      throw new Error(
-        "Password Change Failed! Please Ensure that new password in unique from the previous used 2 passwords!"
-      );
-    }
+    // Commit the transaction
+    await session.commitTransaction();
+    await session.endSession();
 
-    const hashedPassword = await hashPassword(userData?.newPassword);
-    if (previousPasswords && previousPasswords.length > 0) {
-      const crossCheck = await checkCurrentPasswordToPreviousPassword(
-        userData?.newPassword,
-        previousPasswords
-      );
-      if (crossCheck) {
-        throw new Error(
-          "Password Change Failed! Please Ensure that new password in unique from the previous used 2 passwords!"
-        );
-      }
-      if (previousPasswords.length >= 2) {
-        const lastPreviousPassword = await getPreviousPasswords(
-          previousPasswords
-        );
-
-        const deletePreviousPassword = await userModel.findByIdAndUpdate(
-          userId,
-          {
-            $pull: {
-              previousPasswords: {
-                password: lastPreviousPassword.password,
-              },
-            },
-          },
-          {
-            session,
-            runValidators: true,
-          }
-        );
-        if (!deletePreviousPassword) {
-          throw new Error("Failed to change password!");
-        }
-        const changePassword = await userModel.findByIdAndUpdate(
-          userId,
-          {
-            password: hashedPassword,
-            $addToSet: {
-              previousPasswords: {
-                password: hashedPassword,
-                createdAt: new Date(),
-              },
-            },
-          },
-          {
-            session,
-            runValidators: true,
-          }
-        );
-        if (!changePassword) {
-          throw new Error("Failed to change password!");
-        } else {
-          const changePassword = await userModel.findByIdAndUpdate(userId, {
-            password: hashedPassword,
-            $addToSet: {
-              previousPasswords: {
-                password: hashedPassword,
-                createdAt: new Date(),
-              },
-            },
-          });
-          if (!changePassword) {
-            throw new Error("Failed to change password!");
-          }
-        }
-        await session.commitTransaction();
-        await session.endSession();
-
-        const updatedUser = await userModel.findById(userId);
-        return updatedUser;
-      }
-    }
+    // Return the updated user
+    return await userModel.findById(userId);
   } catch (error: any) {
     await session.abortTransaction();
     await session.endSession();
-    throw new Error(error);
+    throw new Error("Failed to change password. " + error.message);
   }
 };
 
@@ -196,66 +177,33 @@ const getAllUserService = async (
   searchText?: string,
   searchFields: string[] = []
 ) => {
-  let query = userModel.find();
-
-  query = applyFilters(query, searchText, searchFields);
-
-  let users: any;
+  let results;
 
   if (page && limit) {
-    const result = await paginateAndSort(query, page, limit);
-
-    result.results = await Promise.all(
-      result.results.map(async (user: any) => {
-        // Updating profile image URL
-        if (user.profile_image) {
-          user.profile_image = `${base_url}/${user.profile_image.replace(
-            /\\/g,
-            "/"
-          )}`;
-        }
-
-        const totalAmount = await paymentModel.aggregate([
-          { $match: { user: user._id, payment_status: "SUCCESS" } },
-          { $group: { _id: null, totalAmount: { $sum: "$amount" } } },
-        ]);
-
-        user.total_amount =
-          totalAmount.length > 0 ? totalAmount[0].totalAmount : 0;
-
-        return user;
-      })
+    const query = userModel.find();
+    const result = await paginateAndSort(
+      query,
+      page,
+      limit,
+      searchText,
+      searchFields
     );
 
-    users = result;
+    result.results = formatResultImage<TUser>(
+      result.results,
+      "profile_image"
+    ) as TUser[];
+
+    return result;
   } else {
-    const results: any = await query.exec();
+    results = await userModel.find().exec();
 
-    const modifiedResults = await Promise.all(
-      results.map(async (user: any) => {
-        if (user.profile_image) {
-          user.profile_image = `${base_url}/${user.profile_image.replace(
-            /\\/g,
-            "/"
-          )}`;
-        }
+    results = formatResultImage(results, "profile_image");
 
-        const totalAmount = await paymentModel.aggregate([
-          { $match: { user: user._id, payment_status: "SUCCESS" } },
-          { $group: { _id: null, totalAmount: { $sum: "$amount" } } },
-        ]);
-
-        user.total_amount =
-          totalAmount.length > 0 ? totalAmount[0].totalAmount : 0;
-
-        return user;
-      })
-    );
-
-    users = { results: modifiedResults };
+    return {
+      results,
+    };
   }
-
-  return users;
 };
 
 //Get single test
@@ -263,29 +211,23 @@ const getSingleUserService = async (userId: number | string) => {
   const queryId =
     typeof userId === "string" ? new mongoose.Types.ObjectId(userId) : userId;
 
-  const userExists = await userModel.isCategoryExists(
-    queryId as number | string
-  );
-  if (!userExists) {
-    throw new Error("User not found");
+  const testExists = await userModel.isUserExists(queryId as number | string);
+  if (!testExists) {
+    throw new Error("Test not found");
   }
 
+  // Find the test by ID
   const result = await userModel.findById(queryId).exec();
   if (!result) {
-    throw new Error("User not found");
+    throw new Error("Test not found");
   }
-  if (result.profile_image) {
-    result.profile_image = `${base_url}/${result.profile_image.replace(
-      /\\/g,
-      "/"
-    )}`;
-  }
-  const totalAmount = await paymentModel.aggregate([
-    { $match: { user: queryId, payment_status: "SUCCESS" } },
-    { $group: { _id: null, totalAmount: { $sum: "$amount" } } },
-  ]);
 
-  result.total_amount = totalAmount.length > 0 ? totalAmount[0].totalAmount : 0;
+  if (typeof result.profile_image === "string") {
+    const formattedAttachment = formatResultImage<TUser>(result.profile_image);
+    if (typeof formattedAttachment === "string") {
+      result.profile_image = formattedAttachment;
+    }
+  }
 
   return result;
 };
