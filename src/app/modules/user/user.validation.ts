@@ -30,10 +30,14 @@ const userLoginValidationSchema = z.object({
     required_error: "email is required",
     invalid_type_error: "email must be a string",
   }),
-  password: z.string({
-    required_error: "Password is required",
-    invalid_type_error: "Password mus be a string",
-  }),
+  password: z
+    .string({
+      required_error: "Password is required",
+      invalid_type_error: "Password mus be a string",
+    })
+    .min(6, {
+      message: "Password must be at least 6 characters long",
+    }),
 });
 
 const changePasswordValidationSchema = z.object({
@@ -55,8 +59,25 @@ const changePasswordValidationSchema = z.object({
     }),
 });
 
+const forgetPasswordValidationSchema = z.object({
+  email: z.string({
+    required_error: "Email is required!",
+  }),
+});
+
+const resetPasswordValidationSchema = z.object({
+  email: z.string({
+    required_error: "Email is required!",
+  }),
+  new_password: z.string({
+    required_error: "User password is required!",
+  }),
+});
+
 export const userValidationSchemas = {
   createUserValidationSchema,
   userLoginValidationSchema,
   changePasswordValidationSchema,
+  forgetPasswordValidationSchema,
+  resetPasswordValidationSchema,
 };

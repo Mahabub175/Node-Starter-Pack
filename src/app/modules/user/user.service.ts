@@ -1,7 +1,7 @@
 import mongoose from "mongoose";
 import config from "../../config";
 import { userModel } from "./user.model";
-import jwt from "jsonwebtoken";
+import jwt, { JwtPayload } from "jsonwebtoken";
 import {
   checkCurrentPasswordToPreviousPassword,
   compareHashPassword,
@@ -12,6 +12,10 @@ import { paginateAndSort } from "../../utils/paginateAndSort";
 import { TUser } from "./user.interface";
 import { Status } from "../../interface/global/global.interface";
 import { formatResultImage } from "../../utils/formatResultImage";
+import { sendEmail } from "../../utils/sendEmail";
+import appError from "../../errors/appError";
+import httpStatus from "http-status";
+import { createToken } from "./auth.utils";
 
 const createUserService = async (userData: TUser) => {
   const result = await userModel.create(userData);
@@ -170,6 +174,81 @@ const changeUserPasswordService = async (
   }
 };
 
+const forgotPasswordService = async (userEmail: string) => {
+  const query = { email: userEmail };
+
+  const user = await userModel.findOne(query);
+
+  if (!user) {
+    throw new appError(httpStatus.NOT_FOUND, "This user is not found!");
+  }
+
+  if (user.status !== Status.ACTIVE) {
+    throw new appError(
+      httpStatus.FORBIDDEN,
+      "This user is inactive! Please contact support."
+    );
+  }
+
+  const jwtPayload = {
+    email: user.email,
+    role: user.role,
+  };
+
+  const resetToken = createToken(
+    jwtPayload,
+    config.jwt_access_secret as string,
+    "10m"
+  );
+
+  const resetUILink = `${config.client_url}?email=${user.email}&token=${resetToken} `;
+
+  sendEmail(user.email, resetUILink);
+};
+
+const resetPasswordService = async (
+  payload: { email: string; new_password: string },
+  token: string
+) => {
+  // checking if the user is exist
+  const query = { email: payload.email };
+
+  const user = await userModel.findOne(query);
+
+  if (!user) {
+    throw new appError(httpStatus.NOT_FOUND, "This user is not found!");
+  }
+  if (user.status !== Status.ACTIVE) {
+    throw new appError(
+      httpStatus.FORBIDDEN,
+      "This user is inactive! Please contact support."
+    );
+  }
+
+  const decoded = jwt.verify(
+    token,
+    config.jwt_access_secret as string
+  ) as JwtPayload;
+
+  if (payload.email !== decoded.email) {
+    throw new appError(httpStatus.FORBIDDEN, "You are forbidden!");
+  }
+
+  //hash new password
+  const newHashedPassword = await hashPassword(payload.new_password);
+
+  await userModel.findOneAndUpdate(
+    {
+      email: decoded.email,
+      role: decoded.role,
+    },
+    {
+      password: newHashedPassword,
+      passwordChangedAt: new Date(),
+    }
+  );
+};
+
 // Get all tests with optional pagination
 const getAllUserService = async (
   page?: number,
@@ -284,6 +363,8 @@ export const userServices = {
   createUserService,
   loginUserService,
   changeUserPasswordService,
+  forgotPasswordService,
+  resetPasswordService,
   getAllUserService,
   getSingleUserService,
   updateUserStatusService,

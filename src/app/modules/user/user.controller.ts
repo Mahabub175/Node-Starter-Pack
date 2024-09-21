@@ -2,6 +2,9 @@ import { NextFunction, Request, Response } from "express";
 import { userServices } from "./user.service";
 import httpStatus from "http-status";
 import { uploadService } from "../upload/upload";
+import catchAsync from "../../utils/catchAsync";
+import sendResponse from "../../utils/sendResponse";
+import appError from "../../errors/appError";
 
 const createUserController = async (
   req: Request,
@@ -66,6 +69,33 @@ const changeUserPasswordController = async (
     next(error);
   }
 };
+
+const forgetPasswordController = catchAsync(async (req, res) => {
+  const userEmail = req.body.email;
+  const result = await userServices.forgotPasswordService(userEmail);
+  sendResponse(res, {
+    statusCode: httpStatus.OK,
+    success: true,
+    message: "Reset link is generated succesfully! Please check your email.",
+    data: result,
+  });
+});
+
+const resetPasswordController = catchAsync(async (req, res) => {
+  const token = req.headers.authorization;
+
+  if (!token) {
+    throw new appError(httpStatus.UNAUTHORIZED, "Unauthorized Access!");
+  }
+
+  const result = await userServices.resetPasswordService(req.body, token);
+  sendResponse(res, {
+    statusCode: httpStatus.OK,
+    success: true,
+    message: "Password reset succesfully!",
+    data: result,
+  });
+});
 
 const getAllUserController = async (
   req: Request,
@@ -187,6 +217,8 @@ export const userControllers = {
   createUserController,
   loginUserController,
   changeUserPasswordController,
+  forgetPasswordController,
+  resetPasswordController,
   getAllUserController,
   getSingleUserController,
   updateUserStatusController,

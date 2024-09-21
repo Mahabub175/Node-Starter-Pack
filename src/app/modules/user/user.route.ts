@@ -25,6 +25,18 @@ router.post(
   userControllers.changeUserPasswordController
 );
 
+router.post(
+  "/auth/forgot-password/",
+  validateRequest(userValidationSchemas.forgetPasswordValidationSchema),
+  userControllers.forgetPasswordController
+);
+
+router.post(
+  "/auth/reset-password/",
+  validateRequest(userValidationSchemas.resetPasswordValidationSchema),
+  userControllers.resetPasswordController
+);
+
 router.get("/auth/user/", userControllers.getAllUserController);
 
 router.get("/auth/user/:userId/", userControllers.getSingleUserController);
