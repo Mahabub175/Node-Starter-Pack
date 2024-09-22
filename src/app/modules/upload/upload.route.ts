@@ -1,5 +1,6 @@
-import express, { Request, Response, NextFunction } from "express";
+import express, { Request, Response } from "express";
 import { uploadService } from "./upload";
+import config from "../../config";
 
 const router = express.Router();
 
@@ -15,10 +16,17 @@ router.post(
         });
       }
 
+      const filePath = req.file.path.replace(/\\/g, "/");
+
+      const fileUrl = `${config.base_url}/${filePath}`;
+
       res.status(200).json({
         success: true,
         message: "File uploaded successfully",
-        file: req.file,
+        file: {
+          ...req.file,
+          url: fileUrl,
+        },
       });
     } catch (error: any) {
       res.status(500).json({
