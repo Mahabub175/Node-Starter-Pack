@@ -3,6 +3,7 @@ import { validateRequest } from "../../middlewares/validateRequest";
 import { userValidationSchemas } from "./user.validation";
 import { userControllers } from "./user.controller";
 import auth from "../../middlewares/auth";
+import { UserRole } from "../../interface/global/global.interface";
 
 const router = express.Router();
 
@@ -20,29 +21,36 @@ router.post(
 
 router.post(
   "/auth/change-password/",
-  auth("user", "admin"),
+  auth(UserRole.ADMIN, UserRole.USER),
   validateRequest(userValidationSchemas.changePasswordValidationSchema),
   userControllers.changeUserPasswordController
 );
 
 router.post(
   "/auth/forgot-password/",
+  auth(UserRole.ADMIN, UserRole.USER),
   validateRequest(userValidationSchemas.forgetPasswordValidationSchema),
   userControllers.forgetPasswordController
 );
 
 router.post(
   "/auth/reset-password/",
+  auth(UserRole.ADMIN, UserRole.USER),
   validateRequest(userValidationSchemas.resetPasswordValidationSchema),
   userControllers.resetPasswordController
 );
 
-router.get("/auth/user/", userControllers.getAllUserController);
+router.get(
+  "/auth/user/",
+  auth(UserRole.ADMIN),
+  userControllers.getAllUserController
+);
 
 router.get("/auth/user/:userId/", userControllers.getSingleUserController);
 
 router.patch(
   "/auth/user/status/:userId/",
+  auth(UserRole.ADMIN),
   userControllers.updateUserStatusController
 );
 
